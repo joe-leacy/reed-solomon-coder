@@ -7,7 +7,7 @@ module gf_mult_ripple#(
 );
 
   //Internal signals
-  wire [WIDTH-1:0] partial_prods [0:WIDTH-1];
+  logic [WIDTH-1:0] partial_prods [WIDTH];
 
 
   assign partial_prods[0] = a_i;
@@ -15,7 +15,7 @@ module gf_mult_ripple#(
   genvar i;
 
   generate
-  for (i = 1; i < WIDTH; i++) begin
+  for (i = 1; i < WIDTH; i++) begin: gen_partial_prods
     assign partial_prods[i] = (partial_prods[i-1] << 1) ^ (partial_prods[i-1][WIDTH-1] ? PRIMITIVE : '0);
   end
   endgenerate

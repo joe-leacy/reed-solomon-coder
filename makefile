@@ -1,5 +1,5 @@
-TOP = gf_mult_ripple_tb
-SRC = src/gf_mult_ripple.sv test/gf_mult_ripple_tb.sv
+TOP = lfsr_tb
+SRC = src/lfsr.sv test/lfsr_tb.sv src/gf_mult_ripple.sv
 EXE = obj_dir/V$(TOP)
 
 all: run
