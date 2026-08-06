@@ -6,15 +6,17 @@ module lfsr #(
 ) (
   input logic clk,
   input logic rst_n,
+  input logic encoded,
   input logic [WIDTH-1:0] data_i,
-  output logic [WIDTH-1:0] remainder_o [LENGTH]
+  output logic [WIDTH-1:0] parity_o [LENGTH]
 );
 
   //Feedback signals
   logic [WIDTH-1:0] feedback;
   logic [WIDTH-1:0] updates [LENGTH];
+  logic [WIDTH-1:0] remainder [LENGTH];
 
-  assign feedback = data_i ^ remainder_o[LENGTH-1];
+  assign feedback = data_i ^ remainder[LENGTH-1];
 
   //Compute LFSR update
   genvar i;
@@ -31,16 +33,29 @@ module lfsr #(
     end
   endgenerate
 
-  //LFSR update to recursively compute remainder polynomial
-  always_ff @ (posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      for (int i = 0; i < LENGTH; i++)
-        remainder_o[i] <= '0;
+  //update remainder
+  always_ff @ (posedge clk, negedge rst_n) begin
+    if (!rst_n || encoded) begin
+      for (int i=0; i<LENGTH; i++)
+        remainder[i] <= '0;
     end
     else begin
-      remainder_o[0] <= updates[0];
-      for (int i = 1; i < LENGTH; i++)
-        remainder_o[i] <= remainder_o[i-1] ^ updates[i];
+      remainder[0] <= updates[0];
+      for (int i=1; i<LENGTH; i++)
+        remainder[i] <= remainder[i-1] ^ updates[i];
+    end
+  end
+
+  //update parity output
+  always_ff @ (posedge clk, negedge rst_n) begin
+    if (!rst_n) begin
+      for (int i=0; i<LENGTH; i++)
+        parity_o[i] <= '0;
+    end
+    else if (encoded) begin
+      parity_o[0] <= updates[0];
+      for (int i=1; i<LENGTH; i++)
+        parity_o[i] <= remainder[i-1] ^ updates[i];
     end
   end
 

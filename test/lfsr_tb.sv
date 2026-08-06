@@ -17,17 +17,15 @@ module lfsr_tb;
   logic [WIDTH-1:0] data;
   logic [WIDTH-1:0] remainder [LFSR_LEN];
   logic [WIDTH-1:0] codeword [CODE_LEN];
-  logic [WIDTH-1:0] parity;
-
-  assign codeword = {message, remainder};
+  logic encoded;
+  logic [WIDTH-1:0] syndrome [LFSR_LEN];
 
   always_comb begin
-    parity = '0;
-    for (int i=0; i<CODE_LEN; i++) begin
-      parity ^= codeword[i];
-    end
+    for (int i=0; i<MSG_LEN; i++)
+      codeword[i] = message[i];
+    for (int j=0; j<LFSR_LEN; j++)
+      codeword[j+MSG_LEN] = remainder[LFSR_LEN-j-1];
   end
-
 
   lfsr #(
     .LENGTH(LFSR_LEN),
@@ -38,7 +36,19 @@ module lfsr_tb;
     .clk (clk),
     .rst_n (rst_n),
     .data_i (data),
-    .remainder_o (remainder)
+    .parity_o (remainder),
+    .encoded  (encoded)
+  );
+
+  syndrome_checker #(
+    .WIDTH (WIDTH),
+    .ALPHA (ALPHA),
+    .N (CODE_LEN),
+    .K (MSG_LEN),
+    .PRIMITIVE (PRIMITIVE)
+  ) u_syndrome_checker (
+    .codeword_i (codeword),
+    .syndrome_o (syndrome)
   );
 
   initial begin
@@ -59,12 +69,14 @@ module lfsr_tb;
     $dumpvars(0, lfsr_tb);
     rst_n = 1'b0;
     data = '0;
+    encoded = 1'b0;
     repeat (2) @ (posedge clk);
     rst_n = 1'b1;
     for (int i=0; i<MSG_LEN; i++) begin
       @ (negedge clk);
       data = message[i];
     end
+    encoded = 1'b1;
     @ (negedge clk)
     $finish;
   end
