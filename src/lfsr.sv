@@ -7,14 +7,15 @@ module lfsr #(
   input logic clk,
   input logic rst_n,
   input logic encoded,
+  input logic next_parity,
   input logic [WIDTH-1:0] data_i,
-  output logic [WIDTH-1:0] parity_o [LENGTH]
+  output logic [WIDTH-1:0] parity_sym_o
 );
 
   //Feedback signals
   logic [WIDTH-1:0] feedback;
   logic [WIDTH-1:0] updates [LENGTH];
-  logic [WIDTH-1:0] remainder [LENGTH];
+  logic [WIDTH-1:0] remainder, parity [LENGTH];
 
   assign feedback = data_i ^ remainder[LENGTH-1];
 
@@ -57,6 +58,12 @@ module lfsr #(
       for (int i=1; i<LENGTH; i++)
         parity_o[i] <= remainder[i-1] ^ updates[i];
     end
+    else if (next_parity) begin
+      for (int i=1; i<LENGTH; i++)
+        parity_o[i] <= parity_o[i-1];
+    end
   end
+
+  assign parity_sym_o = parity_o[LENGTH-1];
 
 endmodule
