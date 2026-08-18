@@ -15,7 +15,8 @@ module lfsr #(
   //Feedback signals
   logic [WIDTH-1:0] feedback;
   logic [WIDTH-1:0] updates [LENGTH];
-  logic [WIDTH-1:0] remainder, parity [LENGTH];
+  logic [WIDTH-1:0] remainder [LENGTH];
+  logic [WIDTH-1:0] parity [LENGTH];
 
   assign feedback = data_i ^ remainder[LENGTH-1];
 
@@ -51,19 +52,19 @@ module lfsr #(
   always_ff @ (posedge clk, negedge rst_n) begin
     if (!rst_n) begin
       for (int i=0; i<LENGTH; i++)
-        parity_o[i] <= '0;
+        parity[i] <= '0;
     end
     else if (encoded) begin
-      parity_o[0] <= updates[0];
+      parity[0] <= updates[0];
       for (int i=1; i<LENGTH; i++)
-        parity_o[i] <= remainder[i-1] ^ updates[i];
+        parity[i] <= remainder[i-1] ^ updates[i];
     end
     else if (next_parity) begin
       for (int i=1; i<LENGTH; i++)
-        parity_o[i] <= parity_o[i-1];
+        parity[i] <= parity[i-1];
     end
   end
 
-  assign parity_sym_o = parity_o[LENGTH-1];
+  assign parity_sym_o = parity[LENGTH-1];
 
 endmodule

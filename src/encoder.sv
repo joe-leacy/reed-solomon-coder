@@ -7,6 +7,7 @@ module encoder #(
 )(
   input logic clk,
   input logic rst_n,
+  input logic valid,
   input logic [WIDTH-1:0] data_i,
   output logic [WIDTH-1:0] code_o
 );
@@ -14,9 +15,12 @@ module encoder #(
 //Reed-Solomon encoder for sequential symbols using an LFSR to perform the
 //encoding and a ping-pong buffer to handle a continuous data stream
 
+  localparam int COUNT_W = (N > 1) ? $clog2(N) : 1;
 
-  logic [WIDTH-1:0] buf_a, buf_b [N];
-  logic [$clog2(N)-1:0] count;
+  logic [WIDTH-1:0] buf_a [N];
+  logic [WIDTH-1:0] buf_b [N];
+  logic [WIDTH-1:0] delay [N-K];
+  logic [COUNT_W-1:0] count;
   logic encoded, parity_finished;
   logic [WIDTH-1:0] parity;
   logic tx_a, parity_select_a, parity_select_b, next_parity;
@@ -42,28 +46,28 @@ module encoder #(
 
   //--------------- Encoding Counter --------------
   always_ff @ (posedge clk, negedge rst_n) begin
-    if (!rst_n || count == N-1) count <= '0;
-    else count <= count + 1;
+    if (!rst_n || count == COUNT_W'(N-1)) count <= '0;
+    else if (valid) count <= count + 1;
   end
 
-  assign encoded = (count == K-1);
-  assign parity_finished = (count == N-1);
+  assign encoded = (count == COUNT_W'(K-1));
+  assign parity_finished = (count == COUNT_W'(N-1));
 
   //----------------------------------------------
 
   //--------------- Ping-Pong FSM ----------------
-  typedef enum logic {FILL_A, PARITY_A, FILL_B, PARITY_B} buf_state_t;
+  typedef enum logic [1:0] {FILL_A, PARITY_A, FILL_B, PARITY_B} buf_state_t;
   buf_state_t curr_state, next_state;
 
   always_ff @ (posedge clk, negedge rst_n) begin
-    if (!rst_n) curr_state <= TX_A;
+    if (!rst_n) curr_state <= FILL_A;
     else curr_state <= next_state;
   end
 
   //next state logic
   always_comb begin
     next_state = curr_state;
-    case (curr_buf_state)
+    case (curr_state)
       FILL_A: begin
         if (encoded) next_state = PARITY_A;
       end
@@ -106,8 +110,22 @@ module encoder #(
     end
   end
 
+  //N-K delay element into buffer B
+  always_ff @ (posedge clk, negedge rst_n) begin
+    if (!rst_n) begin
+      for (int i=0; i<N-K; i++)
+        delay[i] <= '0;
+    end
+    else begin
+      for (int i=1; i<N-K; i++) begin
+        delay[0] <= data_i;
+        delay[i] <= delay[i-1];
+      end
+    end
+  end
+
   assign next_a = parity_select_a ? parity : data_i;
-  assign next_b = parity_select_b ? parity : data_i;
+  assign next_b = parity_select_b ? parity : delay[N-K-1];
 
   assign code_o = tx_a ? buf_a[N-1] : buf_b[N-1];
 

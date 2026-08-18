@@ -1,5 +1,5 @@
 TOP = lfsr_tb
-SRC = src/lfsr.sv test/lfsr_tb.sv src/gf_mult_ripple.sv test/syndrome_checker.sv
+SRC = src/lfsr_comb.sv src/gf_mult_ripple.sv test/lfsr_tb.sv test/syndrome_checker.sv
 EXE = obj_dir/V$(TOP)
 
 all: run
