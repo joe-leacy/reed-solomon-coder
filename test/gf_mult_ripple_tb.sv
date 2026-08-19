@@ -3,15 +3,24 @@ module gf_mult_ripple_tb;
   parameter int WIDTH = 4;
   parameter [WIDTH-1:0] PRIMITIVE = 4'b0011;
 
-  logic [WIDTH-1:0] a, b, prod;
+  logic [WIDTH-1:0] a, b, prod1, prod2;
 
   gf_mult_ripple #(
     .WIDTH(WIDTH),
     .PRIMITIVE(PRIMITIVE)
-  ) u_gfm (
+  ) u_gfr (
     .a_i(a),
     .b_i(b),
-    .product_o(prod)
+    .product_o(prod1)
+  );
+
+  gf_mult_parallel #(
+    .WIDTH(WIDTH),
+    .PRIMITIVE(PRIMITIVE)
+  ) u_gfp (
+    .a_i(a),
+    .b_i(b),
+    .product_o(prod2)
   );
 
   initial begin

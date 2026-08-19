@@ -1,70 +1,74 @@
 module lfsr #(
-  parameter int LENGTH = 30,
   parameter int WIDTH = 10,
-  parameter logic [WIDTH-1:0] GENERATOR [LENGTH],
+  parameter int N = 544,
+  parameter int K = 514,
+  parameter int UNROLL = 2,
+  parameter logic [WIDTH-1:0] GENERATOR [N-K],
   parameter logic [WIDTH-1:0] PRIMITIVE
 ) (
   input logic clk,
   input logic rst_n,
-  input logic encoded,
-  input logic next_parity,
-  input logic [WIDTH-1:0] data_i,
-  output logic [WIDTH-1:0] parity_sym_o
+  input logic [WIDTH-1:0] data [UNROLL],
+  output logic [WIDTH-1:0] parity [N-K]
 );
 
-  //Feedback signals
-  logic [WIDTH-1:0] feedback;
-  logic [WIDTH-1:0] updates [LENGTH];
-  logic [WIDTH-1:0] remainder [LENGTH];
-  logic [WIDTH-1:0] parity [LENGTH];
+  logic [WIDTH-1:0] update [UNROLL][N-K];
+  logic [WIDTH-1:0] update_partial [1:K-1][1:N-K-1];
 
-  assign feedback = data_i ^ remainder[LENGTH-1];
+  genvar i,j;
 
-  //Compute LFSR update
-  genvar i;
+  //First stage of update for all indices
   generate
-    for (i=0; i<LENGTH; i++) begin: gen_gf_mults
+    for (i=0; i<N-K; i++) begin: gen_first_parity
       gf_mult_ripple #(
         .WIDTH (WIDTH),
         .PRIMITIVE (PRIMITIVE)
       ) u_gfm (
-        .a_i (feedback),
+        .a_i (data_i[0] ^ parity[N-K]),
         .b_i (GENERATOR[i]),
-        .product_o (updates[i])
+        .product_o (update[0][i])
       );
     end
   endgenerate
 
-  //update remainder
-  always_ff @ (posedge clk, negedge rst_n) begin
-    if (!rst_n || encoded) begin
-      for (int i=0; i<LENGTH; i++)
-        remainder[i] <= '0;
+  //Compute update at index 0
+  generate
+    for(i=1; i<UNROLL; i++) begin: gen_parity_0
+      gf_mult_ripple #(
+        .WIDTH (WIDTH),
+        .PRIMITIVE (PRIMITIVE)
+      ) u_gfm (
+        .a_i (update[i-1][N-K-1] ^ data[i]),
+        .b_i (GENERATOR),
+        .product_o (update[i][0])
+      );
     end
-    else begin
-      remainder[0] <= updates[0];
-      for (int i=1; i<LENGTH; i++)
-        remainder[i] <= remainder[i-1] ^ updates[i];
-    end
-  end
+  endgenerate
 
-  //update parity output
-  always_ff @ (posedge clk, negedge rst_n) begin
-    if (!rst_n) begin
-      for (int i=0; i<LENGTH; i++)
+  //Compute update for remaining indices
+  generate
+    for (i=1; i<UNROLL; i++)
+      for (j=1; j<N-K; j++) begin: gen_parity_remaining
+        gf_mult_ripple #(
+          .WIDTH (WIDTH),
+          .PRIMITIVE (PRIMITIVE)
+        ) u_gfm (
+          .a_i (update[i-1][N-K-1] ^ data[i]),
+          .b_i (GENERATOR[j]),
+          .product_o (update_partial[i][j])
+        );
+        assign update[i][j] = update_partial[i][j] ^ update[i-1][j-1];
+      end
+  endgenerate
+
+
+  always_ff @ (posedge clk) begin
+    if (!rst_n)
+      for (int i=0; i<N-K; i++)
         parity[i] <= '0;
-    end
-    else if (encoded) begin
-      parity[0] <= updates[0];
-      for (int i=1; i<LENGTH; i++)
-        parity[i] <= remainder[i-1] ^ updates[i];
-    end
-    else if (next_parity) begin
-      for (int i=1; i<LENGTH; i++)
-        parity[i] <= parity[i-1];
-    end
+    else
+      for (int i=0; i<N-K; i++)
+        parity[i] <= update[UNROLL-1][i];
   end
-
-  assign parity_sym_o = parity[LENGTH-1];
 
 endmodule
